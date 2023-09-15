@@ -79,7 +79,11 @@ export REGION_NAME=<REGION_NAME>
 ```bash
 cd linear_ec
 wget https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/HIGGS.xz
-python partition_data.py --file-path HIGGS.xz --n-workers <n_workers> --bucket-name <data_bucket> --use-dummy-data
+python partition_data.py \
+  --file-path HIGGS.xz \
+  --n-workers <n_workers> \
+  --bucket-name <data_bucket> \
+  --use-dummy-data  # 10 samples per partition
 ```
 
 4. Setting training configurations in the handler of [Lambda 1](linear_ec/lambda1/linear_ec_1.py).
@@ -102,7 +106,7 @@ aws lambda invoke --function-name linear_ec_1 /dev/stdout
 
 8. (Optional) Updating the function code
 
-You must build, tag, upload the new image again. Then update the Lambda function with the new image with the `update-function-code`, e.g.:
+You must build, tag, upload the new image again. Then update the Lambda function with the new image, e.g.:
 ```bash
 aws lambda update-function-code \
   --function-name linear_ec_2 \
@@ -129,7 +133,9 @@ docker run -p 9000:8080 \
 ```
 3. From a new terminal window, post the event to the following endpoint
 ```bash
-curl "http://localhost:9000/2015-03-31/functions/function/invocations" -H "Content-Type: application/json" -d @linear_ec/lambda1/test_input_1_worker.json
+curl "http://localhost:9000/2015-03-31/functions/function/invocations" \
+  -H "Content-Type: application/json" \
+  -d @linear_ec/lambda1/test_input_1_worker.json
 ```
 
 ## Discussions
