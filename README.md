@@ -22,25 +22,43 @@ This repository demonstrates how to train a collection of Machine Learning model
 
 ### [Linear Classification with Memcached](linear_ec)
 
-AWS Resources used:
+AWS resources used:
 - Lambda
     - Lambda 1: configuring and invoking a pool of Lambda 2
-    - Lambda 2: main training script
-- S3: storing ML dataset
-- ElastiCache for Memcached: gradient exchange in distributed training
+    - Lambda 2: training script for each worker
+- S3
+- ElastiCache for Memcached
 - VPC
 - CloudWatch
 
 Dataset: [Higgs](https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary.html#HIGGS)
 
+Hyperparams of the training:
+- Number of workers: `<n_workers>`
+  - Specifies the number of workers used for parallel training. To distribute among <n_workers>, you'll need <n_workers> partitions of the dataset.
+
 **Setup Steps**
 
-1. Prepare AWS Resources with AWS console
+1. Configure the AWS CLI
 
-- Create an VPC. And create the endpoint to privately connect VPC to S3 (choose com.amazonaws.region.s3 as the service name).
-- Create an Elasticache cluster. Detailed configurations may refer to the [video](https://www.youtube.com/watch?v=58PMo2N8rxA). Copy the "configuration endpoint" for later use.
-- Create an S3 bucket.
-- Create an Lambda execution role. Copy ARN for later use. Assign necessary permissions:
+```bash
+aws configure
+```
+
+Also, store AWS environmental variables for easier reference in later steps.
+ ```bash
+export AWS_ACCESS_KEY_ID=<AWS_ACCESS_KEY_ID>
+export AWS_SECRET_ACCESS_KEY=<AWS_SECRET_ACCESS_KEY>
+export AWS_ACCOUNT_ID=<AWS_ACCOUNT_ID>
+export REGION_NAME=<REGION_NAME>
+ ```
+
+2. Prepare AWS Resources with AWS console
+
+- A VPC. And create the endpoint to privately connect VPC to S3 (choose com.amazonaws.region.s3 as the service name).
+- An Elasticache cluster for Memcached, used for gradient exchange in distributed training. Detailed configurations may refer to the [video](https://www.youtube.com/watch?v=58PMo2N8rxA). Copy the "configuration endpoint" for later use.
+- An S3 bucket, named as `<data_bucket>`, to store machine learning dataset
+- A Lambda execution role. Assign necessary permissions:
     - AmazonAPIGatewayInvokeFullAccess
     - AmazonEC2FullAccess
     - AmazonElastiCacheFullAccess
@@ -51,47 +69,51 @@ Dataset: [Higgs](https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary.
     - CloudWatchFullAccess
     - VPCLatticeServicesInvokeAccess
 
-2. Download, partition, and upload dataset to S3
+  Store the ARN (Amazon Resource Names) of the role for later reference. 
+  ```bash
+  export LAMBDA_ROLE_ARN=<LAMBDA_ROLE_ARN>
+  ```
 
-Consider the hparams: `n_workers`, `bucket_name` (must exist in S3)
+3. Download, partition, and upload dataset to S3
+
 ```bash
 cd linear_ec
 wget https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/HIGGS.xz
-python partition_data.py --file-path HIGGS.xz --n-workers 2 --bucket-name higgs-2 --use-dummy-data
+python partition_data.py --file-path HIGGS.xz --n-workers <n_workers> --bucket-name <data_bucket> --use-dummy-data
 ```
 
-3. Modifying some hparams in the handler of [Lambda 1](linear_ec/lambda1/linear_ec_1.py).
+4. Setting training configurations in the handler of [Lambda 1](linear_ec/lambda1/linear_ec_1.py).
 
-- Set `host` as the "configuration endpoint" in step 1
-- Set `n_workers` and`data_bucket` as `n_workers` and `bucket_name` in step 2
+- Set `host` as the "configuration endpoint" of the Memcached
+- Set `n_workers` and`data_bucket`
 - (optional) modifying other hparams
 
-4. Deploying function package on AWS Lambda
-
-Set environment variables and the role ARN set in step 1 in the top of the [build script](linear_ec/build_lambda.sh), and run:
+5. Deploying function package on AWS Lambda with the [build script](linear_ec/build_lambda.sh):
 ```bash
 bash build_lambda.sh
 ```
 
-5. Invoking the Lambda function
+6. Invoking the Lambda function
 ```bash
 aws lambda invoke --function-name linear_ec_1 /dev/stdout
 ```
 
-6. Open CloudWatch and Check logs 
+7. Open CloudWatch and Check logs 
 
-7. (Optional) Updating the function code
+8. (Optional) Updating the function code
 
-You must build, tag, upload the new image again. Then update the Lambda function with the new image:
+You must build, tag, upload the new image again. Then update the Lambda function with the new image with the `update-function-code`, e.g.:
 ```bash
-aws lambda update-function-code --function-name linear_ec_2 --image-uri 051291761206.dkr.ecr.us-west-1.amazonaws.com/linear_ec_2:latest
+aws lambda update-function-code \
+  --function-name linear_ec_2 \
+  --image-uri "${AWS_ACCOUNT_ID}.dkr.ecr.${REGION_NAME}.amazonaws.com/linear_ec_2:latest"
 ```
 
 **Debug Steps**
 
-After building the image of the lambda, we test it locally. 
+After building the image of the lambda, we can test it locally. 
 
-Take testing the image of `linear_ec_2` for example.
+For instance, let's consider testing the image of `linear_ec_2`.
 1. Prepare the input event as json file
 ```bash
 python linear_ec/lambda1/save_1_worker_output.py
@@ -99,10 +121,10 @@ python linear_ec/lambda1/save_1_worker_output.py
 2. Start the Docker image
 ```bash
 docker run -p 9000:8080 \
-  -e AWS_ACCESS_KEY_ID=<AWS_ACCESS_KEY_ID> \
-  -e AWS_SECRET_ACCESS_KEY=<AWS_SECRET_ACCESS_KEY> \
-  -e AWS_ACCOUNT_ID=<AWS_ACCOUNT_ID> \
-  -e REGION_NAME=<REGION_NAME> \
+  -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
+  -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
+  -e AWS_ACCOUNT_ID="$AWS_ACCOUNT_ID \
+  -e REGION_NAME="$REGION_NAME" \
   docker-image:test
 ```
 3. From a new terminal window, post the event to the following endpoint
@@ -113,11 +135,12 @@ curl "http://localhost:9000/2015-03-31/functions/function/invocations" -H "Conte
 ## Discussions
 
 ### Deploying Lambda functions with container images instead of zip
-An AWS Lambda function's code comprises your function's handler code, together with libraries your code depends on. To deploy this function code to Lambda, you use a deployment package. This package may either be a .zip file archive or a container image. You can benefit from zip package by shorter cold start time than the container package, but AWS has little quota for it (50MB zipped, and 250MB unzipped). Layer (256MB quota), which you may turn to for supplementary storage, also fails to support large package. For example, it is infeasible to package PyTorch in zip due to the torch package (e.g. torch-1.0.1+cpu-py37 is 219MB, torch-1.0.1-py37 with cuda 1.1G) is too big. 
+An AWS Lambda function's code consists of your function's handler code and any required libraries. To deploy this function code to Lambda, you have two options: a .zip file archive or a container image. While using a .zip package offers shorter cold start times compared to a container package, AWS imposes size limits (50MB zipped and 250MB unzipped). Even the use of layers (with a 256MB quota) for additional storage may not support large packages. For instance, packaging PyTorch in a .zip file is not feasible due to the large size of the torch package. For example, torch-1.0.1-py37 without CUDA is 219MB, while the version with CUDA support exceeds 1.1GB.
 
 ### Creating Lambda functions with AWS Lambda API instead of SAM
-Two technical routes of creating Lambda functions are:
-1. Serverless Application Model (SAM) in YAML: one-stop solution for creating and configuring a collection of AWS resources: lambda, S3, Memcached, etc.
-2. Creating Lambda functions using AWS Lambda API from CML, and other AWS resources on aws console. 
+There are two technical approaches to creating Lambda functions:
 
-Finally, the second route is chosen since SAM specifies a memory size of 3008 MB in some regions (like us-west-1). In contrast, AWS Lambda API allows to create functions with up to 10,240 MB of memory.
+- Serverless Application Model (SAM) in YAML: A comprehensive solution for creating and configuring various AWS resources, including Lambda functions, S3, Memcached, and more.
+- Creating Lambda functions using the AWS Lambda API from the command line interface (CLI) and other AWS resources via the AWS Management Console.
+
+Ultimately, the second approach is chosen primarily because SAM enforces a memory size limit of 3008 MB in some regions (e.g., us-west-1). In contrast, the AWS Lambda API allows you to create functions with up to 10 GB of memory.

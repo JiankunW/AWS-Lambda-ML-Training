@@ -1,15 +1,14 @@
 #!/bin/bash
 
-# Replace with yours
-AWS_ACCESS_KEY_ID=<AWS_ACCESS_KEY_ID>
-AWS_SECRET_ACCESS_KEY=<AWS_SECRET_ACCESS_KEY>
-AWS_ACCOUNT_ID=<AWS_ACCOUNT_ID>
-REGION_NAME=<REGION_NAME>
-LAMBDA_ROLE_ARN=<LAMBDA_ROLE_ARN>
-
-if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$AWS_ACCOUNT_ID" ] || [ -z "$REGION_NAME" ] || [ -z "$LAMBDA_ROLE_ARN" ]; then
-    echo "Error: some AWS environmental variables haven't set up."
+# Set these environment variables before running
+if [ -z "$AWS_ACCESS_KEY_ID" ] || \
+   [ -z "$AWS_SECRET_ACCESS_KEY" ] || \
+   [ -z "$AWS_ACCOUNT_ID" ] || \
+   [ -z "$REGION_NAME" ] || \
+   [ -z "$LAMBDA_ROLE_ARN" ]; then
+    echo "One or more required AWS environment variables are not set. Please ensure that AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_ACCOUNT_ID, REGION_NAME, and LAMBDA_ROLE_ARN are all properly configured."
     exit 1
+fi
 
 # Step 1: Building the image
 docker build --platform linux/amd64 -t linear_ec_1_image:test ./lambda1

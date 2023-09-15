@@ -28,6 +28,6 @@ if __name__ == '__main__':
     parser.add_argument("-f", "--file-path", type=str, help="Path to the .xz compressed dataset file")
     parser.add_argument("-n", "--n-workers", type=int, help="Number of partitions")
     parser.add_argument("-b", "--bucket-name", type=int, help="Bucket name of S3")
-    parser.add_argument("--use-dummy-data", action="store_true", help="Use dummy data (default is False)")
+    parser.add_argument("--use-dummy-data", action="store_true", help="Use dummy data, assigning 10 samples per partition (default is False, uniformly partitioning the whole dataset)")
     args = parser.parse_args()
     main(**vars(args))
