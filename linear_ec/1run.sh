@@ -14,5 +14,5 @@ do
     -v ~/fileshare:/app/data \
     -a stdout -a stderr \
     -e JSON_EVENT="$json_event" \
-    "linear_ec_2_worker${i}:test" > output${i}.txt 2>&1 & 
+    "linear_ec_2_worker:test" > output${i}.txt 2>&1 & 
 done
