@@ -1,4 +1,4 @@
-from storage import MemcachedStorage
+from storage import BaseStorage
 from communicator import Communicator
 from communicator import memcached_primitive, memcached_primitive_nn
 
@@ -7,7 +7,7 @@ class MemcachedCommunicator(Communicator):
 
     def __init__(self, _storage, _tmp_bucket, _merged_bucket, _num_workers, _worker_index):
         super(MemcachedCommunicator, self).__init__(_storage)
-        assert isinstance(self.storage, MemcachedStorage)
+        assert isinstance(self.storage, BaseStorage)
         self.tmp_bucket = _tmp_bucket
         self.merged_bucket = _merged_bucket
         self.num_workers = _num_workers

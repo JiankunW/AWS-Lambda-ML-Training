@@ -6,7 +6,7 @@ from storage import MemcachedStorage
 
 
 def async_reduce(storage, input_bytes, bucket_name, object_name):
-    assert isinstance(storage, MemcachedStorage)
+    # assert isinstance(storage, MemcachedStorage)
 
     storage.save_v2(input_bytes, object_name, bucket_name)
 
@@ -17,7 +17,7 @@ def async_reduce(storage, input_bytes, bucket_name, object_name):
 
 
 def reduce_batch(storage, input_bytes, tmp_bucket, merged_bucket, num_workers, worker_index, cur_epoch, cur_batch):
-    assert isinstance(storage, MemcachedStorage)
+    # assert isinstance(storage, MemcachedStorage)
 
     postfix = "{}_{}".format(cur_epoch, cur_batch)
 
@@ -64,7 +64,7 @@ def reduce_batch(storage, input_bytes, tmp_bucket, merged_bucket, num_workers, w
 
 
 def reduce_epoch(storage, input_bytes, tmp_bucket, merged_bucket, num_workers, worker_index, cur_epoch):
-    assert isinstance(storage, MemcachedStorage)
+    # assert isinstance(storage, MemcachedStorage)
 
     postfix = str(cur_epoch)
 
@@ -112,7 +112,7 @@ def reduce_epoch(storage, input_bytes, tmp_bucket, merged_bucket, num_workers, w
 
 # delete the merged values of the *current or older* steps
 def delete_expired_batch(storage, bucket_name, cur_epoch, cur_batch):
-    assert isinstance(storage, MemcachedStorage)
+    # assert isinstance(storage, MemcachedStorage)
     candidate_keys = []
     for epoch in range(cur_epoch):
         for batch in range(cur_batch):
@@ -122,7 +122,7 @@ def delete_expired_batch(storage, bucket_name, cur_epoch, cur_batch):
 
 
 def delete_expired_epoch(storage, bucket_name, cur_epoch):
-    assert isinstance(storage, MemcachedStorage)
+    # assert isinstance(storage, MemcachedStorage)
     candidate_keys = []
     for epoch in range(cur_epoch):
         candidate_keys.append("{}_{}".format(bucket_name, epoch))
@@ -131,7 +131,7 @@ def delete_expired_epoch(storage, bucket_name, cur_epoch):
 
 
 def reduce_scatter_batch(storage, input_bytes, tmp_bucket, merged_bucket, num_workers, worker_index, cur_epoch, cur_batch):
-    assert isinstance(storage, MemcachedStorage)
+    # assert isinstance(storage, MemcachedStorage)
 
     postfix = "{}_{}".format(cur_epoch, cur_batch)
 
@@ -178,7 +178,7 @@ def reduce_scatter_batch(storage, input_bytes, tmp_bucket, merged_bucket, num_wo
 
 
 def reduce_scatter_epoch(storage, input_bytes, tmp_bucket, merged_bucket, num_workers, worker_index, cur_epoch):
-    assert isinstance(storage, MemcachedStorage)
+    # assert isinstance(storage, MemcachedStorage)
 
     postfix = str(cur_epoch)
 

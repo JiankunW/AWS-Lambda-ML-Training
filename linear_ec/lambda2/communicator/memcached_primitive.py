@@ -7,7 +7,7 @@ from storage import MemcachedStorage
 
 
 def async_reduce(storage, vector, bucket_name, vector_name):
-    assert isinstance(storage, MemcachedStorage)
+    # assert isinstance(storage, MemcachedStorage)
 
     # vector is supposed to be a 1-d numpy array
     vec_shape = vector.shape
@@ -21,7 +21,6 @@ def async_reduce(storage, vector, bucket_name, vector_name):
 
 
 def reduce_batch(storage, vector, tmp_bucket, merged_bucket, num_workers, worker_index, cur_epoch, cur_batch):
-    assert isinstance(storage, MemcachedStorage)
 
     # vector is supposed to be a 1-d numpy array
     vec_shape = vector.shape
@@ -39,10 +38,12 @@ def reduce_batch(storage, vector, tmp_bucket, merged_bucket, num_workers, worker
     if worker_index == 0:
         num_files = 0
         candidate_keys = ["{}_{}_{}".format(tmp_bucket, w, postfix) for w in range(num_workers)]
+        print("candidate_keys: ", candidate_keys)
 
         while num_files < num_workers:
             objects = storage.list(candidate_keys)
             if objects is not None:
+                print("get keys: ", objects.keys())
                 delete_keys = []
                 for file_key, value in objects.items():
                     key_splits = file_key.split("_")
@@ -56,9 +57,9 @@ def reduce_batch(storage, vector, tmp_bucket, merged_bucket, num_workers, worker
                     delete_keys.append(file_key)
                     candidate_keys.remove(file_key)
                 storage.delete(delete_keys)
-            # else:
-                # print("GET None, waiting...")
-                # time.sleep(1.5) 
+            else:
+                print("GET None, waiting...", candidate_keys)
+                time.sleep(1.5) 
         print("------worker {} epoch {} batch {}------ pass GET".format(worker_index, cur_epoch, cur_batch))
         # write the merged data back to memcache
         merged_file_key = postfix
@@ -78,7 +79,7 @@ def reduce_batch(storage, vector, tmp_bucket, merged_bucket, num_workers, worker
 
 
 def reduce_epoch(storage, vector, tmp_bucket, merged_bucket, num_workers, worker_index, cur_epoch):
-    assert isinstance(storage, MemcachedStorage)
+    # assert isinstance(storage, MemcachedStorage)
 
     # vector is supposed to be a 1-d numpy array
     vec_shape = vector.shape
@@ -125,7 +126,7 @@ def reduce_epoch(storage, vector, tmp_bucket, merged_bucket, num_workers, worker
 
 # delete the merged values of the *current or older* steps
 def delete_expired_batch(storage, bucket_name, cur_epoch, cur_batch):
-    assert isinstance(storage, MemcachedStorage)
+    # assert isinstance(storage, MemcachedStorage)
     candidate_keys = []
     for epoch in range(cur_epoch):
         for batch in range(cur_batch):
@@ -136,7 +137,7 @@ def delete_expired_batch(storage, bucket_name, cur_epoch, cur_batch):
 
 
 def delete_expired_epoch(storage, bucket_name, cur_epoch):
-    assert isinstance(storage, MemcachedStorage)
+    # assert isinstance(storage, MemcachedStorage)
     candidate_keys = []
     for epoch in range(cur_epoch):
         candidate_keys.append("{}_{}".format(bucket_name, epoch))
@@ -146,7 +147,7 @@ def delete_expired_epoch(storage, bucket_name, cur_epoch):
 
 
 def reduce_scatter_batch(storage, vector, tmp_bucket, merged_bucket, num_workers, my_rank, cur_epoch, cur_batch):
-    assert isinstance(storage, MemcachedStorage)
+    # assert isinstance(storage, MemcachedStorage)
 
     # vector is supposed to be a 1-d numpy array
     num_all_values = vector.size
@@ -231,7 +232,7 @@ def reduce_scatter_batch(storage, vector, tmp_bucket, merged_bucket, num_workers
 
 
 def reduce_scatter_epoch(storage, vector, tmp_bucket, merged_bucket, num_workers, my_rank, cur_epoch):
-    assert isinstance(storage, MemcachedStorage)
+    # assert isinstance(storage, MemcachedStorage)
 
     # vector is supposed to be a 1-d numpy array
     num_all_values = vector.size

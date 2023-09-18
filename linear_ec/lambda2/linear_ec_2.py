@@ -1,18 +1,88 @@
-import time
+import time, os
 
 import numpy as np
 import torch
 from torch.autograd import Variable
 from torch.utils.data.sampler import SubsetRandomSampler
+from pymemcache.client import base
+import json
 
 from data_loader import libsvm_dataset
 from utils.constants import Prefix, MLModel, Optimization, Synchronization
-from storage import S3Storage, MemcachedStorage
+from storage import BaseStorage
 from communicator import MemcachedCommunicator
 from model import linear_models
 
 
-def handler(event, context):
+def data_reader(path: str) -> bytes:
+    with open(path, 'rb') as f:
+        b = f.read()
+    return b
+
+
+class PyMemStorage(BaseStorage):
+    def __init__(self, ip, port=11211):
+        super(PyMemStorage, self).__init__()
+        self.client = base.Client((ip, port))
+
+    def save(self, src_data, key):
+        # if isinstance(src_data, bytes):
+        #     src_data = src_data.decode('utf-8')
+        return self.client.set(key, src_data)
+
+    def save_v2(self, src_data, key, field):
+        print("start save_v2")
+        mem_key = field + "_" + key
+        print(mem_key)
+        print(src_data)
+        res = self.save(src_data, mem_key)
+        print("done save_v2")
+        return res
+
+    def load(self, key):
+        return self.client.get(key)
+
+    def load_v2(self, key, field):
+        mem_key = field + "_" + key
+        return self.load(key=mem_key)
+
+    def load_or_wait(self, key, sleep_time=0.1, time_out=60):
+        start_time = time.time()
+        while True:
+            if time.time() - start_time > time_out:
+                return None
+            response = self.load(key)
+            if response is not None:
+                return response
+            time.sleep(sleep_time)
+
+    def load_or_wait_v2(self, key, field, sleep_time=0.1, time_out=60):
+        mem_key = field + "_" + key
+        return self.load_or_wait(mem_key, sleep_time, time_out)
+
+    def delete(self, key):
+        if isinstance(key, str):
+            return self.client.delete(key)
+        elif isinstance(key, list):
+            return self.client.delete_multi(key)
+
+    def clear(self):
+        return self.client.flush_all()
+
+    def list(self, keys=[""]):
+        res = self.client.get_multi(keys)
+        if bool(res):
+            return res
+        else:
+            return None
+
+
+def handler():
+
+    json_path = os.environ.get("JSON_EVENT")
+    print(json_path)
+    with open(json_path, 'r') as json_file:
+        event = json.load(json_file)
     print("Received event from linear_ec_1:", event)
     start_time = time.time()
 
@@ -55,9 +125,9 @@ def handler(event, context):
     print('optimization = {}'.format(optim))
     print('sync mode = {}'.format(sync_mode))
 
-    s3_storage = S3Storage()
+    # s3_storage = S3Storage()
     print("1")
-    mem_storage = MemcachedStorage(host, port)
+    mem_storage = PyMemStorage(host, port)
     print("2")
     communicator = MemcachedCommunicator(mem_storage, tmp_bucket, merged_bucket, n_workers, worker_index)
     print("3")
@@ -67,7 +137,7 @@ def handler(event, context):
 
     # Read file from s3
     read_start = time.time()
-    lines = s3_storage.load(file, data_bucket).read().decode('utf-8').split("\n")
+    lines = data_reader(file).decode('utf-8').split("\n")
     lines.pop(-1)
     print("read data cost {} s".format(time.time() - read_start))
 
@@ -142,6 +212,7 @@ def handler(event, context):
                         postfix = "{}_{}".format(epoch, batch_idx)
 
                         if sync_mode == "reduce":
+                            print("begin reduce...")
                             w_b_grad_merge = communicator.reduce_batch(w_b_grad, epoch, batch_idx)
                         elif sync_mode == "reduce_scatter":
                             w_b_grad_merge = communicator.reduce_scatter_batch(w_b_grad, epoch, batch_idx)
@@ -270,3 +341,6 @@ def handler(event, context):
             'statusCode': 500,
             'body': 'Error in linear_ec_2'
         }
+
+if __name__ == "__main__":
+    handler()

@@ -1,5 +1,3 @@
-from storage.s3.s3_type import S3Storage
-from communicator import s3_primitive, s3_primitive_nn
 
 
 class Communicator(object):
